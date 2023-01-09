@@ -7,5 +7,3 @@ https://www.transitchicago.com/developers/bustracker/
 Create a .env file in your project, and add:
 API_KEY='your_key_here'
 
-pip install -r requirements.txt will install all the required libraries.
-
