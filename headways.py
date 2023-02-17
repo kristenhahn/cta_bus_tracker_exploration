@@ -149,60 +149,48 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
         start_time = min(times)
         end_time = max(times)
 
-        # make a single-row dataframe containing start and end times of 
+        print(f'service id {service_id}, start {start_time}, end {end_time}')
+
+        # make a 2-row dataframe containing start and end times of 
         # one service id at this stop
         df = pd.DataFrame(
-            [[service_id, start_time, end_time]],
-            columns=['service_id', 'start_time', 'end_time'])
+            [[service_id, start_time, 1],[service_id, end_time, -1]],
+            columns=['service_id', 'time', 'adjustment'])
 
         # Add this service id's time range to the dataframe for all service id's time ranges
         service_ranges = pd.concat([service_ranges, df])
 
         # sort ranges by start time
-        service_ranges.sort_values('start_time', inplace=True)
+        service_ranges.sort_values('time', inplace=True)
 
         # list the start time of the next range
-        service_ranges['next_start_time'] = np.roll(service_ranges['start_time'].tolist(), shift=-1,)
-
-        # remove next start time from the last line
-        service_ranges['next_start_time'].iloc[-1] = None
-
+        service_ranges['services_running'] = service_ranges['adjustment'].cumsum(axis=0)
 
     # reset the index
     service_ranges.reset_index(inplace=True)
 
+    print(service_ranges)
+
+
     # generate a list of start and end times when ANY service is active.
     active_service_times = pd.DataFrame()
     start_time = 0
-    end_time = 0
+    previously_inservice = 0
 
     # iterate through all service id's time ranges
     for idx, row in service_ranges.iterrows():
 
-        # last range:  set the end time for the current in-service
-        # range and add in-service range to the list.
-        if idx == len(service_ranges) - 1:
-            end_time = row['end_time']
-            # active_service_times.append((start_time, end_time))
+        # prevously no service, service just started: add a start time
+        if (previously_inservice == 0) & (row['adjustment'] == 1):
+            start_time = row['time']
+            previously_inservice = row['services_running']
+
+        # previously service, now all service ended:
+        elif (previously_inservice > 0) & (row['services_running'] == 0):
+            end_time = row['time']
             df_timerange = pd.DataFrame([[start_time, end_time],], columns=['start_time','end_time'])
             active_service_times = pd.concat([active_service_times, df_timerange])
-
-        else:
-
-            #  if there was no service before this range began:
-            #  start a new in-service time range with a new start time
-            if start_time == 0:
-                start_time = row['start_time']
-
-            # if there is a service gap after this range: 
-            # this service's end time is the end of the overall in-service time.
-            # End the in-service range and add it to the list.
-            if row['next_start_time'] > row['end_time']:
-                end_time = row['end_time']
-                # active_service_times.append([start_time, end_time])
-                df_timerange = pd.DataFrame([[start_time, end_time],], columns=['start_time','end_time'])
-                active_service_times = pd.concat([active_service_times, df_timerange])
-                start_time = 0
+            previously_inservice = 0
 
     return active_service_times
 
@@ -941,4 +929,28 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
 
 
 
+# %%
+# Scratch 
+
+gtfs_version_id = '20230105'
+
+gtfs_feed = download_extract_format(gtfs_version_id) 
+
+route_id = '50'
+
+stop_details = get_scheduled_stop_details(gtfs_feed, route_id, '2023-01-18')
+
+vehicles = get_chn_vehicles('2023-01-22')
+
+stop_id = '8858'
+
+direction = 'Southbound'
+
+# %%
+
+active_service_times = get_active_service_times(stop_details, stop_id, direction)
+
+active_service_times
+# %%
+# stop_details.loc[stop_details['stop_id'] == stop_id].sort_values(['service_id', 'stop_time']).head(50)
 # %%
