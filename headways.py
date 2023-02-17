@@ -124,10 +124,10 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
 
     Data returned:\n
 
-    List of lists:  each sub-list contains two timestamps representing the start and end of
-    an in-service timeframe. These are continuous time ranges when ANY buses on any service 
-    for this route and direction are running at a given bus stop.  identifying these will 
-    allow us skip out-of-service times in the headway calcs, so those won't show up incorrectly
+    Pandas DataFrame containing a row indicating the start and end times for each 
+    in-service timeframe. These are continuous time ranges when ANY buses on any service 
+    for this route and direction are running at a given bus stop.  identifying these
+    allows us to skip out-of-service times in the headway calcs so they don't show up incorrectly
     as long headways.
     '''
 
@@ -152,48 +152,54 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
         print(f'service id {service_id}, start {start_time}, end {end_time}')
 
         # make a 2-row dataframe containing start and end times of 
-        # one service id at this stop
+        # one service id at this stop.
+        # The adjustment column will be used to cumulatively count the 
+        # services running at any given time.  Adding a service means an adjustment
+        # of 1, while ending a service means an adjustment of -1.
         df = pd.DataFrame(
             [[service_id, start_time, 1],[service_id, end_time, -1]],
             columns=['service_id', 'time', 'adjustment'])
 
-        # Add this service id's time range to the dataframe for all service id's time ranges
+        # Add this service id's times to the dataframe for all service times
         service_ranges = pd.concat([service_ranges, df])
 
-        # sort ranges by start time
+        # sort by time
         service_ranges.sort_values('time', inplace=True)
 
-        # list the start time of the next range
+        # add a column to show how many services are running (cumulative sum of the 
+        # 'adjustment' column)
         service_ranges['services_running'] = service_ranges['adjustment'].cumsum(axis=0)
 
     # reset the index
     service_ranges.reset_index(inplace=True)
 
-    print(service_ranges)
-
 
     # generate a list of start and end times when ANY service is active.
     active_service_times = pd.DataFrame()
+
+    # initially there is no start time and no services are running.
     start_time = 0
     previously_inservice = 0
 
-    # iterate through all service id's time ranges
+    # iterate through all service id's start and end times. 
     for idx, row in service_ranges.iterrows():
 
         # prevously no service, service just started: add a start time
         if (previously_inservice == 0) & (row['adjustment'] == 1):
             start_time = row['time']
+            # reset previously_inservice variable for the next iteration
             previously_inservice = row['services_running']
 
-        # previously service, now all service ended:
+        # previously there was at least one service running, last service just ended:  Add an end time
+        # and add the start/end times to the dataframe of all continuous active service times.
         elif (previously_inservice > 0) & (row['services_running'] == 0):
             end_time = row['time']
             df_timerange = pd.DataFrame([[start_time, end_time],], columns=['start_time','end_time'])
             active_service_times = pd.concat([active_service_times, df_timerange])
+            # reset previously_inservice variable to zero for the next iteration
             previously_inservice = 0
 
     return active_service_times
-
 
 
 # %%
@@ -250,9 +256,6 @@ def get_scheduled_headways(stop_details:pd.DataFrame , stop_id:str, direction:st
 
 
 
-
-
-
 # %%
 
 def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_column_prefix='') -> pd.DataFrame:
@@ -285,12 +288,6 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
         col_name_25th = f'{output_column_prefix} {col_name_25th}'
         col_name_median = f'{output_column_prefix} {col_name_median}'
         col_name_75th = f'{output_column_prefix} {col_name_75th}'
-
-    # # Put stats in dataframe rounded to minutes
-    # output[col_name_mean] = [headways_col.mean().total_seconds.round('min')]
-    # output[col_name_25th] = [headways_col.quantile(0.25).round('min')]
-    # output[col_name_median] = [headways_col.median().round('min')]
-    # output[col_name_75th] = [headways_col.quantile(0.75).round('min')]
 
     # convert to actual minutes as an integer and add to a dataframe
     output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
@@ -365,14 +362,6 @@ def get_chn_vehicles(date_string:str) -> pd.DataFrame:
     df_day2_vehicles = get_vehicles_single_day(day2_string)
     
     df_both_days_vehicles = pd.concat([df_day1_vehicles, df_day2_vehicles])
-
-   
-    # service_day_start = day1+pd.Timedelta(start_timedelta_string_expanded)
-    # service_day_end = day1+pd.Timedelta(end_timedelta_string_expanded)
-
-    # df_vehicles = df_both_days_vehicles.loc[
-    #     (service_day_start < df_both_days_vehicles['tmstmp'])
-    #     & (df_both_days_vehicles['tmstmp'] <= service_day_end)]
  
     return df_both_days_vehicles
 
@@ -720,12 +709,12 @@ def get_actual_headways(
         by the get_active_service_times() function.\n
 
         Data returned:\n
-        Columns are added to the vehicles dataframe indicating the start and end time
-        and the start and end distances along a pattern for each interval where a bus
-        passed a stop (start_time, end_time, start_pdist, end_pdist), the estimated time 
-        each bus actually arrived at the stop (est_stop_time), and headway between each 
-        bus (est_headway).  Direction of travel (rtdir) and stop id (stpid)
-        are also included.\n
+        Columns are added to the vehicles dataframe indicating :\n
+        - the start and end time and the start and end distances along a pattern for each interval where a bus
+        passed a stop (start_time, end_time, start_pdist, end_pdist),\n
+        - the estimated time each bus actually arrived at the stop (est_stop_time), and headway between each 
+        bus (est_headway).  
+        - Direction of travel (rtdir) and stop id (stpid) are also included.\n
         Headways are not calculated for the first bus in each active service period.  This
         ensures that regularly scheduled out-of-service periods do not appear as long headways.
         '''
@@ -927,30 +916,3 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
 
     return gdf
 
-
-
-# %%
-# Scratch 
-
-gtfs_version_id = '20230105'
-
-gtfs_feed = download_extract_format(gtfs_version_id) 
-
-route_id = '50'
-
-stop_details = get_scheduled_stop_details(gtfs_feed, route_id, '2023-01-18')
-
-vehicles = get_chn_vehicles('2023-01-22')
-
-stop_id = '8858'
-
-direction = 'Southbound'
-
-# %%
-
-active_service_times = get_active_service_times(stop_details, stop_id, direction)
-
-active_service_times
-# %%
-# stop_details.loc[stop_details['stop_id'] == stop_id].sort_values(['service_id', 'stop_time']).head(50)
-# %%
