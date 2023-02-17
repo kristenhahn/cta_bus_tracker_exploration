@@ -131,3 +131,5 @@ dmypy.json
 
 # gtfs downloads
 gtfs/
+
+.vscode/
