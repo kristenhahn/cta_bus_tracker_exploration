@@ -128,7 +128,9 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
     in-service timeframe. These are continuous time ranges when ANY buses on any service 
     for this route and direction are running at a given bus stop.  identifying these
     allows us to skip out-of-service times in the headway calcs so they don't show up incorrectly
-    as long headways.
+    as long headways.\n
+
+    Note:  Some services only run one bus - these will show the same start and end time.
     '''
 
     # dataframe to contain service time ranges
@@ -149,7 +151,7 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
         start_time = min(times)
         end_time = max(times)
 
-        print(f'service id {service_id}, start {start_time}, end {end_time}')
+        # print(f'service id {service_id}, start {start_time}, end {end_time}')
 
         # make a 2-row dataframe containing start and end times of 
         # one service id at this stop.
@@ -277,23 +279,26 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
     headways_col = headways[headway_column_name]
 
     output = pd.DataFrame()
+        
+    if len(headways) > 0:
 
-    col_name_mean = 'mean headway (min)'
-    col_name_25th = '25th percentile headway (min)'
-    col_name_median = 'median headway (min)'
-    col_name_75th = '75th percentile headway (min)'
+        col_name_mean = 'mean headway (min)'
+        col_name_25th = '25th percentile headway (min)'
+        col_name_median = 'median headway (min)'
+        col_name_75th = '75th percentile headway (min)'
 
-    if output_column_prefix != '':
-        col_name_mean = f'{output_column_prefix} {col_name_mean}'
-        col_name_25th = f'{output_column_prefix} {col_name_25th}'
-        col_name_median = f'{output_column_prefix} {col_name_median}'
-        col_name_75th = f'{output_column_prefix} {col_name_75th}'
+        if output_column_prefix != '':
+            col_name_mean = f'{output_column_prefix} {col_name_mean}'
+            col_name_25th = f'{output_column_prefix} {col_name_25th}'
+            col_name_median = f'{output_column_prefix} {col_name_median}'
+            col_name_75th = f'{output_column_prefix} {col_name_75th}'
 
-    # convert to actual minutes as an integer and add to a dataframe
-    output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
-    output[col_name_25th] = [int(round((headways_col.quantile(0.25).total_seconds()/60),0))]
-    output[col_name_median] = [int(round((headways_col.median().total_seconds()/60),0))]
-    output[col_name_75th] = [int(round((headways_col.quantile(0.75).total_seconds()/60),0))]
+        # convert to actual minutes as an integer and add to a dataframe
+        if all(headways_col.apply(lambda x: type(x) == pd.Timedelta)):
+            output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
+            output[col_name_25th] = [int(round((headways_col.quantile(0.25).total_seconds()/60),0))]
+            output[col_name_median] = [int(round((headways_col.median().total_seconds()/60),0))]
+            output[col_name_75th] = [int(round((headways_col.quantile(0.75).total_seconds()/60),0))]
 
     return output
 
@@ -727,16 +732,16 @@ def get_actual_headways(
         # Filter to buses stopping at the specified stop in the specified direction
         df_stop_direction = df_stoptimes.loc[
             (df_stoptimes['stpid'] == stop_id)]
-            # & (df_stoptimes['rtdir'] == direction)
-            # ]
+
+        df_stop_direction = df_stop_direction.loc[
+            (df_stop_direction['rtdir'] == direction)]
 
         # Consider each active service timeframe
         for start_time, end_time in list(zip(
             active_service_times['start_time'],
             active_service_times['end_time'])):
 
-            print(f'{start_time} to {end_time}')
-
+            # print(f'{start_time} to {end_time}')
 
             # filter for stops happening after the service time start
             df_stop_direction_servicetime = df_stop_direction.loc[
@@ -750,31 +755,34 @@ def get_actual_headways(
 
             # print(df_stop_direction_servicetime)
 
-            # Sort chronologically
-            df_stop_direction_servicetime.sort_values(by='est_stop_time',ascending=True, inplace=True)
+            # proceed if there are any stops within the service time window:
+            if len(df_stop_direction_servicetime) > 0:
 
-            # list stop times in chronological order
-            stop_times = df_stop_direction_servicetime['est_stop_time'].tolist()
+                # Sort chronologically
+                df_stop_direction_servicetime.sort_values(by='est_stop_time',ascending=True, inplace=True)
 
-            # calculate previous stop time for each line
-            prev_stop_times = np.roll(stop_times,1)
-            df_stop_direction_servicetime['previous_stop_time'] = prev_stop_times
+                # list stop times in chronological order
+                stop_times = df_stop_direction_servicetime['est_stop_time'].tolist()
 
-            # calculate headway
-            df_stop_direction_servicetime['est_headway'] = (
-                df_stop_direction_servicetime['est_stop_time'] 
-                - df_stop_direction_servicetime['previous_stop_time']
-                )
+                # calculate previous stop time for each line
+                prev_stop_times = np.roll(stop_times,1)
+                df_stop_direction_servicetime['previous_stop_time'] = prev_stop_times
 
-            # drop previous stop time column, no longer needed
-            df_stop_direction_servicetime = df_stop_direction_servicetime.drop(
-                    'previous_stop_time', axis=1)
+                # calculate headway
+                df_stop_direction_servicetime['est_headway'] = (
+                    df_stop_direction_servicetime['est_stop_time'] 
+                    - df_stop_direction_servicetime['previous_stop_time']
+                    )
 
-            # Remove headway from the first bus in the dataset since we don't have the 
-            # previous bus to compare with
-            df_stop_direction_servicetime['est_headway'].iloc[0] = None
-                
-            df_output = pd.concat([df_output, df_stop_direction_servicetime])
+                # drop previous stop time column, no longer needed
+                df_stop_direction_servicetime = df_stop_direction_servicetime.drop(
+                        'previous_stop_time', axis=1)
+
+                # Remove headwat for the first bus in the dataset since we don't have the 
+                # previous bus to compare with
+                df_stop_direction_servicetime['est_headway'].iloc[0] = None
+                    
+                df_output = pd.concat([df_output, df_stop_direction_servicetime])
 
         return df_output
 
@@ -877,11 +885,15 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
 
             # get actual headway stats
             actual_headways = get_actual_headways(vehicles, route_id, stop_id, direction, active_service_times)
+            # Remove rows without headways (first bus in each active service time)
+            actual_headways = actual_headways[actual_headways['est_headway'].notnull()]
+          
+            
             actual_headway_stats = get_headway_stats(actual_headways, 'est_headway', 'Actual')
-
 
             stop_df = pd.DataFrame()
             stop_df['stop_id'] = [stop_id]
+            stop_df['route_id'] = [route_id]
             # date
             stop_df['date'] = [service_date_string]
             # day of week
