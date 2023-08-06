@@ -29,7 +29,6 @@ API_KEY = os.getenv('API_KEY')
 ###########
 
 
-
 # %% [markdown]
 # # Get Scheduled Stop Times and Headways
 #    
@@ -197,8 +196,9 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
             # reset previously_inservice variable for the next iteration
             previously_inservice = row['services_running']
 
-        # previously there was at least one service running, last service just ended:  Add an end time
-        # and add the start/end times to the dataframe of all continuous active service times.
+        # previously there was at least one service running, and the last service just ended:  
+        # Add an end time and add the start/end times to the dataframe of all 
+        # continuous active service times.
         elif (previously_inservice > 0) & (row['services_running'] == 0):
             end_time = row['time']
             df_timerange = pd.DataFrame([[start_time, end_time],], columns=['start_time','end_time'])
@@ -914,7 +914,7 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             # stats_for_one_stop_df.reset_index(inplace=True, drop=True)
 
             # add stop info to the dataframe containing info on all stops
-            stats_all_stops = pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0)
+            stats_all_stops = gpd.GeoDataFrame(pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0))
             # stats_all_stops.reset_index(inplace=True, drop=True)
             # print(stats_all_stops.columns)
 
