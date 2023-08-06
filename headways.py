@@ -3,11 +3,16 @@ import requests
 from dotenv import load_dotenv
 import pandas as pd
 import geopandas as gpd
-from shapely import Point, LineString
+from shapely.geometry import Point, LineString
 import datetime as dt
 import numpy as np
-from static_gtfs_analysis import *
 import pendulum
+
+# import chn-ghost-buses files
+import sys
+sys.path.append('/Users/kristenhahn/repos/chn-ghost-buses')
+from data_analysis.static_gtfs_analysis import *
+from scrape_data.scrape_data import *
 
 
 # %%
@@ -207,7 +212,7 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
 # %%
 
 # Get scheduled headways
-def get_scheduled_headways(stop_details:pd.DataFrame , stop_id:str, direction:str):
+def get_scheduled_headways(stop_details:pd.DataFrame , stop_id:str, direction:str, active_service_times:pd.DataFrame):
 
     '''
     Parameters:\n
@@ -226,9 +231,10 @@ def get_scheduled_headways(stop_details:pd.DataFrame , stop_id:str, direction:st
     # dataframe to contain the output
     df_headways = pd.DataFrame()
 
-    # get the start and end of all timeframes when one or more service is actively 
-    # running for the specified stop and direction of travel
-    active_service_times = get_active_service_times(stop_details, stop_id, direction)
+    # Moved to arguments for consistency with the get_actual_headways() function
+    # # get the start and end of all timeframes when one or more service is actively 
+    # # running for the specified stop and direction of travel
+    # active_service_times = get_active_service_times(stop_details, stop_id, direction)
 
 
     # stop details filtered to one stop_id and direction
@@ -282,10 +288,13 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
         
     if len(headways) > 0:
 
-        col_name_mean = 'mean headway (min)'
-        col_name_25th = '25th percentile headway (min)'
-        col_name_median = 'median headway (min)'
-        col_name_75th = '75th percentile headway (min)'
+        # filter to actual values, not null / nat, nan, etc.
+        headways_col = headways_col[pd.notnull(headways_col)].copy()
+
+        col_name_mean = 'mean headway (minutes)'
+        col_name_25th = '25th percentile headway (minutes)'
+        col_name_median = 'median headway (minutes)'
+        col_name_75th = '75th percentile headway (minutes)'
 
         if output_column_prefix != '':
             col_name_mean = f'{output_column_prefix} {col_name_mean}'
@@ -293,13 +302,15 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
             col_name_median = f'{output_column_prefix} {col_name_median}'
             col_name_75th = f'{output_column_prefix} {col_name_75th}'
 
-        # convert to actual minutes as an integer and add to a dataframe
-        if all(headways_col.apply(lambda x: type(x) == pd.Timedelta)):
-            output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
-            output[col_name_25th] = [int(round((headways_col.quantile(0.25).total_seconds()/60),0))]
-            output[col_name_median] = [int(round((headways_col.median().total_seconds()/60),0))]
-            output[col_name_75th] = [int(round((headways_col.quantile(0.75).total_seconds()/60),0))]
 
+        # convert to actual minutes as an integer and add to a dataframe
+
+        # if all(headways_col.apply(lambda x: type(x) == pd.Timedelta)):
+        output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
+        output[col_name_25th] = [int(round((headways_col.quantile(0.25).total_seconds()/60),0))]
+        output[col_name_median] = [int(round((headways_col.median().total_seconds()/60),0))]
+        output[col_name_75th] = [int(round((headways_col.quantile(0.75).total_seconds()/60),0))]
+        
     return output
 
 
@@ -787,9 +798,6 @@ def get_actual_headways(
         return df_output
 
 
-
-
-
 # %%
 def get_average_wait_time(headways:pd.DataFrame) -> pd.DataFrame:
     '''Parameters:\n
@@ -845,12 +853,12 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
 
     Returns a geodataframe containing all stops with actual and scheduled headway statistics.\n
     
-    Exports the headway data for each stop as a geojson to the headway_summaries directory.\n
+    Exports the headway summary data for each stop as a geojson to the headway_summaries directory.\n
     Also exports a linestring for the selected route as a geojson.
     '''
 
     # dataframe to contain final summary data for each stop
-    stats_all_stops = pd.DataFrame()
+    stats_all_stops = gpd.GeoDataFrame()
 
     # get scheduled stop details
     scheduled_stop_details = get_scheduled_stop_details(gtfs_feed, route_id, service_date_string)
@@ -863,12 +871,10 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
     # get actual stop times
     actual_stoptimes = get_actual_stoptimes(route_id, vehicles)
     # get actual stop ids
-    actual_stop_ids = get_actual_stop_ids(actual_stoptimes)
-
-
-    # get common stops
+    actual_stop_ids = get_actual_stop_ids(actual_stoptimes
+                                          
+    # get stops found in both the live data and the gtfs schedule data
     common_stops = actual_stop_ids.intersection(scheduled_stop_ids)
-
 
     for stop_id in common_stops:
 
@@ -877,18 +883,20 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
 
         for direction in directions:
 
-            # get scheduled headway stats
+            # get active service times
             active_service_times = get_active_service_times(scheduled_stop_details,stop_id, direction)
-            scheduled_headways = get_scheduled_headways(scheduled_stop_details, stop_id, direction)
+
+            # get scheduled headway stats
+            scheduled_headways = get_scheduled_headways(scheduled_stop_details, stop_id, direction, active_service_times)
+            # Remove rows without headways (first bus in each active service time)
+            scheduled_headways = scheduled_headways[scheduled_headways['headway'].notnull()]
             scheduled_headway_stats = get_headway_stats(scheduled_headways, 'headway', 'Scheduled')
 
 
-            # get actual headway stats
+            # get actual headway stats within active service times
             actual_headways = get_actual_headways(vehicles, route_id, stop_id, direction, active_service_times)
             # Remove rows without headways (first bus in each active service time)
             actual_headways = actual_headways[actual_headways['est_headway'].notnull()]
-          
-            
             actual_headway_stats = get_headway_stats(actual_headways, 'est_headway', 'Actual')
 
             stop_df = pd.DataFrame()
@@ -899,11 +907,13 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             # day of week
             stop_df['day'] = pd.to_datetime(stop_df['date'],infer_datetime_format=True).dt.day_name()
             stop_df['direction'] = [direction]
-            stop_df = pd.concat([stop_df, actual_headway_stats, scheduled_headway_stats], axis=1)
 
-            stats_all_stops = pd.concat([stats_all_stops, stop_df])
+            stats_for_one_stop_df = pd.concat([stop_df, actual_headway_stats, scheduled_headway_stats], axis=1)
+            # stats_for_one_stop_df.reset_index(inplace=True, drop=True)
 
-            stats_all_stops.reset_index(inplace = True, drop = True)
+            stats_all_stops = pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0)
+            # stats_all_stops.reset_index(inplace=True, drop=True)
+            # print(stats_all_stops.columns)
 
             # combine bus stop geospatial info with the stats dataframe
             # to generate a geojson with stats for every stop point
@@ -912,19 +922,24 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             route_linestring = get_pattern_linestrings(patterns)
 
             # merge stop geodataframe with headway stats
-            gdf = stops[['stpid', 'stpnm', 'geometry']]
-            gdf = gdf.merge(stats_all_stops, left_on='stpid', right_on='stop_id')
+            df_stops = gpd.GeoDataFrame(stops[['stpid', 'stpnm', 'geometry']])
+            stats_all_stops = stats_all_stops.merge(df_stops, left_on='stop_id', right_on='stpid')
 
-            gdf = gdf.drop('stpid', axis=1)
-            gdf = gdf.rename(columns={'stpnm':'stop name', 'stop_id':'stop id'})
+            stats_all_stops = stats_all_stops.drop('stpid', axis=1)
+            stats_all_stops = stats_all_stops.rename(columns={'stpnm':'stop name', 'stop_id':'stop id'})
+            stats_all_stops.reset_index(inplace = True, drop = True)
 
-            # Export stop data to geojson
-            json_filepath_stops = f'headway_summaries/route{route_id}_{service_date_string}.json'
-            gdf.to_file(filename=json_filepath_stops, driver='GeoJSON')
+            print(stats_all_stops.columns)
 
-            # export route linestring data to geojson
-            json_filepath_linestring = f'headway_summaries/route{route_id}_linestring.json'
-            route_linestring.to_file(json_filepath_linestring, driver='GeoJSON')
+            # # Export stop data to geojson
+            # json_filepath_stops = f'headway_summaries/route{route_id}_{service_date_string}.json'
+            # stats_all_stops.to_file(filename=json_filepath_stops, driver='GeoJSON')
 
-    return gdf
+            # # export route linestring data to geojson
+            # json_filepath_linestring = f'headway_summaries/route{route_id}_linestring.json'
+            # route_linestring.to_file(json_filepath_linestring, driver='GeoJSON')
 
+    return stats_all_stops
+
+
+# %%
