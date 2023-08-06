@@ -871,7 +871,7 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
     # get actual stop times
     actual_stoptimes = get_actual_stoptimes(route_id, vehicles)
     # get actual stop ids
-    actual_stop_ids = get_actual_stop_ids(actual_stoptimes
+    actual_stop_ids = get_actual_stop_ids(actual_stoptimes)
                                           
     # get stops found in both the live data and the gtfs schedule data
     common_stops = actual_stop_ids.intersection(scheduled_stop_ids)
@@ -899,6 +899,7 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             actual_headways = actual_headways[actual_headways['est_headway'].notnull()]
             actual_headway_stats = get_headway_stats(actual_headways, 'est_headway', 'Actual')
 
+            # get basic stop info
             stop_df = pd.DataFrame()
             stop_df['stop_id'] = [stop_id]
             stop_df['route_id'] = [route_id]
@@ -908,36 +909,36 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             stop_df['day'] = pd.to_datetime(stop_df['date'],infer_datetime_format=True).dt.day_name()
             stop_df['direction'] = [direction]
 
+            # add headway data to stop info
             stats_for_one_stop_df = pd.concat([stop_df, actual_headway_stats, scheduled_headway_stats], axis=1)
             # stats_for_one_stop_df.reset_index(inplace=True, drop=True)
 
+            # add stop info to the dataframe containing info on all stops
             stats_all_stops = pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0)
             # stats_all_stops.reset_index(inplace=True, drop=True)
             # print(stats_all_stops.columns)
 
-            # combine bus stop geospatial info with the stats dataframe
-            # to generate a geojson with stats for every stop point
-            patterns = get_patterns(vehicles, route_id)
-            stops = get_pattern_stops(patterns)
-            route_linestring = get_pattern_linestrings(patterns)
+    # combine bus stop geospatial info with the stats dataframe
+    # to generate a geojson with stats for every stop point
+    patterns = get_patterns(vehicles, route_id)
+    stops = get_pattern_stops(patterns)
+    route_linestring = get_pattern_linestrings(patterns)
 
-            # merge stop geodataframe with headway stats
-            df_stops = gpd.GeoDataFrame(stops[['stpid', 'stpnm', 'geometry']])
-            stats_all_stops = stats_all_stops.merge(df_stops, left_on='stop_id', right_on='stpid')
+    # merge stop geodataframe with headway stats
+    df_stops = gpd.GeoDataFrame(stops[['stpid', 'stpnm', 'geometry']])
+    stats_all_stops = stats_all_stops.merge(df_stops, left_on='stop_id', right_on='stpid')
 
-            stats_all_stops = stats_all_stops.drop('stpid', axis=1)
-            stats_all_stops = stats_all_stops.rename(columns={'stpnm':'stop name', 'stop_id':'stop id'})
-            stats_all_stops.reset_index(inplace = True, drop = True)
+    stats_all_stops = stats_all_stops.drop('stpid', axis=1)
+    stats_all_stops = stats_all_stops.rename(columns={'stpnm':'stop name', 'stop_id':'stop id'})
+    stats_all_stops.reset_index(inplace = True, drop = True)
 
-            print(stats_all_stops.columns)
+    # Export stop data to geojson
+    json_filepath_stops = f'headway_summaries/route{route_id}_{service_date_string}.json'
+    stats_all_stops.to_file(filename=json_filepath_stops, driver='GeoJSON')
 
-            # # Export stop data to geojson
-            # json_filepath_stops = f'headway_summaries/route{route_id}_{service_date_string}.json'
-            # stats_all_stops.to_file(filename=json_filepath_stops, driver='GeoJSON')
-
-            # # export route linestring data to geojson
-            # json_filepath_linestring = f'headway_summaries/route{route_id}_linestring.json'
-            # route_linestring.to_file(json_filepath_linestring, driver='GeoJSON')
+    # export route linestring data to geojson
+    json_filepath_linestring = f'headway_summaries/route{route_id}_linestring.json'
+    route_linestring.to_file(json_filepath_linestring, driver='GeoJSON')
 
     return stats_all_stops
 
