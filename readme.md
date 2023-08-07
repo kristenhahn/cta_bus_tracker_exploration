@@ -13,7 +13,7 @@ API_KEY='your_key_here'
 
 ### What headways.py does:  Overview
 
-For a quick hands-in view of what this code does, see jupyter notebook at https://github.com/kristenhahn/cta_bus_tracker_exploration/blob/main/all_headways_all_stops_single_route.ipynb.
+For a quick hands-on view of what this code does, see jupyter notebook at https://github.com/kristenhahn/cta_bus_tracker_exploration/blob/main/all_headways_all_stops_single_route.ipynb.
 
 - Calculates active service times for a given bus stop and direction of travel. These are continuous time ranges when ANY buses on any service for this route and direction are scheduled to be running at a given bus stop. Identifying these active service times allows us to skip out-of-service periods in the headway calcs so they don't show up incorrectly as long headways.  Active service times are based on gtfs schedule information, and they are specific to each bus stop and direction of travel.
 
