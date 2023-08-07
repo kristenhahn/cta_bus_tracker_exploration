@@ -54,7 +54,15 @@ a given pattern and the distance along the pattern where each stop is located.
 
 5. Calculate headways ONLY for the times service is active on that route/stop/direction of travel. This fixes an earlier issue where out-of-service times looked like long headways.  
 
-6. Calculate summary statistics on headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
+## Detailed approach:  Scheduled Headways
+
+1. Get gtfs-feed data for all stops on a given route and day.  
+
+2. Filter down to the specified bus stop and direction of travel.
+
+2. Calculate scheduled headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
+
+3. Calculate summary statistics on scheduled headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
 
 
 ## Detailed Approach: Actual Stop Times and Headways
@@ -67,11 +75,11 @@ a given pattern and the distance along the pattern where each stop is located.
 
 4. Combine all stop times for buses running the same direction at a particular stop into a dataFrame.
 
-5. Calculate headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
+5. Calculate actual headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
 
 Note: If a bus arrives outside of the active service times expected for a given bus stop, that bus will not be counted in the headway calculations for that stop.  For each active service time range, headways are calculated starting with the second bus arriving in the active service time range (because there has to be a previous bus to set the start of the headway interval).   Headway calculations end with the last bus in the active service time range.
 
-6. Calculate summary statistics on headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
+6. Calculate summary statistics on actual headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
 
 ## To Do
 
