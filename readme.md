@@ -10,6 +10,9 @@ https://www.transitchicago.com/assets/1/6/cta_Bus_Tracker_API_Developer_Guide_an
 Create a .env file in your project, and add:
 API_KEY='your_key_here'
 
+### CAUTION:  
+### Headway data is NOT valid for bus stops near the ends of a route.
+  This code relies on 5-minute snapshot data to determine when a bus has passed a given stop.  For a bus stop within 5-minutes travel time of the end of a route, the bus may be captured before the stop but not there will be no data point past the stop.  Therefore, these buses are not accurately captured in this data set.
 
 ### What headways.py does:  Overview
 
@@ -67,21 +70,27 @@ a given pattern and the distance along the pattern where each stop is located.
 
 ## Detailed Approach: Actual Stop Times and Headways
 
-1. Turn vehicle data into intervals:  Time and distance are recorded at the start and end of each 5-minute interval.
+1. See caution above. Headway data is NOT valid for bus stops near the ends of a route.
 
-2. For a given stop and pattern, find all intervals where a vehicle on that pattern reached or passed the stop.
+2. Turn vehicle data into intervals:  Time and distance are recorded at the start and end of each 5-minute interval.
 
-3. Calculate the approximate time each bus actually reached the stop through interpolation.  The interval gives time and distance location along a given pattern before and after the bus arrived at the stop.  The CTA's pattern data tells us where the bus stop falls along the pattern.  Stop times are estimated assuming the vehicle travels a constant spaeed througout the interval.
+3. For a given stop and pattern, find all intervals where a vehicle on that pattern reached or passed the stop.
 
-4. Combine all stop times for buses running the same direction at a particular stop into a dataFrame.
+4. Calculate the approximate time each bus actually reached the stop through interpolation.  The interval gives time and distance location along a given pattern before and after the bus arrived at the stop.  The CTA's pattern data tells us where the bus stop falls along the pattern.  Stop times are estimated assuming the vehicle travels a constant spaeed througout the interval.
 
-5. Calculate actual headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
+5. Combine all stop times for buses running the same direction at a particular stop into a dataFrame.
+
+6. Calculate actual headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
 
 Note: If a bus arrives outside of the active service times expected for a given bus stop, that bus will not be counted in the headway calculations for that stop.  For each active service time range, headways are calculated starting with the second bus arriving in the active service time range (because there has to be a previous bus to set the start of the headway interval).   Headway calculations end with the last bus in the active service time range.
 
-6. Calculate summary statistics on actual headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
+7. Calculate summary statistics on actual headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
 
 ## To Do
+
+- Investigate how to address bus stops near the end of a route (see the caution message above)
+
+- Investigate adding 5-10 minutes to the beginning and end of each active service interval, so that slightly early/late buses in the realtime data are accounted for
 
 - Investigate why stops are duplicated in the summary data for some routes in the geoDataFrames and geoJSON files.
 
