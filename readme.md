@@ -65,7 +65,7 @@ a given pattern and the distance along the pattern where each stop is located.
 
 2. Calculate scheduled headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
 
-3. Calculate summary statistics on scheduled headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
+3. Calculate summary statistics on scheduled headways for this bus stop and route (total daily buses, mean, 25th Percentile, median, 75th percentile)
 
 
 ## Detailed Approach: Actual Stop Times and Headways
@@ -84,13 +84,15 @@ a given pattern and the distance along the pattern where each stop is located.
 
 Note: If a bus arrives outside of the active service times expected for a given bus stop, that bus will not be counted in the headway calculations for that stop.  For each active service time range, headways are calculated starting with the second bus arriving in the active service time range (because there has to be a previous bus to set the start of the headway interval).   Headway calculations end with the last bus in the active service time range.
 
-7. Calculate summary statistics on actual headways for this bus stop and route (mean, 25th Percentile, median, 75th percentile)
+7. Calculate summary statistics on actual headways for this bus stop and route (total daily buses, mean, 25th Percentile, median, 75th percentile)
+
+Note that the total daily bus number may be off by 1-2 even if all buses are running.  Any bus that arrives slightly outside the expected active service times will not be counted.  See to do list below.
 
 ## To Do
 
 - Investigate how to address bus stops near the end of a route (see the caution message above)
 
-- Investigate adding 5-10 minutes to the beginning and end of each active service interval, so that slightly early/late buses in the realtime data are accounted for
+- Investigate adding 5-10 minutes to the beginning and end of each active service interval, so that slightly early/late buses in the realtime data are accounted for in the actual headway data.
 
 - Investigate why stops are duplicated in the summary data for some routes in the geoDataFrames and geoJSON files.
 
