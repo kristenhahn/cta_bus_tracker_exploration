@@ -12,7 +12,7 @@ API_KEY='your_key_here'
 
 ### CAUTION:  
 ### Headway data is NOT valid for bus stops near the ends of a route.
-  This code relies on 5-minute snapshot data to determine when a bus has passed a given stop.  For a bus stop within 5-minutes travel time of the end of a route, the bus may be captured before the stop but not there will be no data point past the stop.  Therefore, these buses are not accurately captured in this data set.
+  This code relies on 5-minute snapshot data to determine when a bus has passed a given stop.  For a bus stop within 5 minutes travel time of the end of a route, the bus may be captured before the stop but there will be no data point past the stop.  Therefore, these buses are not accurately captured in this data set.
 
 ### What headways.py does:  Overview
 
