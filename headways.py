@@ -291,12 +291,14 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
         # filter to actual values, not null / nat, nan, etc.
         headways_col = headways_col[pd.notnull(headways_col)].copy()
 
+        col_name_total = 'TEST - not ready yet - total buses'
         col_name_mean = 'mean headway (minutes)'
         col_name_25th = '25th percentile headway (minutes)'
         col_name_median = 'median headway (minutes)'
         col_name_75th = '75th percentile headway (minutes)'
 
         if output_column_prefix != '':
+            col_name_total = f'{output_column_prefix} {col_name_total}'
             col_name_mean = f'{output_column_prefix} {col_name_mean}'
             col_name_25th = f'{output_column_prefix} {col_name_25th}'
             col_name_median = f'{output_column_prefix} {col_name_median}'
@@ -306,6 +308,7 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
         # convert to actual minutes as an integer and add to a dataframe
 
         # if all(headways_col.apply(lambda x: type(x) == pd.Timedelta)):
+        output[col_name_total] = [len(headways)]
         output[col_name_mean] = [int(round((headways_col.mean().total_seconds()/60),0))]
         output[col_name_25th] = [int(round((headways_col.quantile(0.25).total_seconds()/60),0))]
         output[col_name_median] = [int(round((headways_col.median().total_seconds()/60),0))]
@@ -914,7 +917,7 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
             # stats_for_one_stop_df.reset_index(inplace=True, drop=True)
 
             # add stop info to the dataframe containing info on all stops
-            stats_all_stops = gpd.GeoDataFrame(pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0))
+            stats_all_stops = pd.concat([stats_all_stops, stats_for_one_stop_df], axis = 0)
             # stats_all_stops.reset_index(inplace=True, drop=True)
             # print(stats_all_stops.columns)
 
@@ -931,6 +934,7 @@ def get_stats_all_stops(gtfs_feed, route_id, service_date_string):
     stats_all_stops = stats_all_stops.drop('stpid', axis=1)
     stats_all_stops = stats_all_stops.rename(columns={'stpnm':'stop name', 'stop_id':'stop id'})
     stats_all_stops.reset_index(inplace = True, drop = True)
+    stats_all_stops = gpd.GeoDataFrame(stats_all_stops)
 
     # Export stop data to geojson
     json_filepath_stops = f'headway_summaries/route{route_id}_{service_date_string}.json'
