@@ -18,7 +18,7 @@ API_KEY='your_key_here'
 
 For a quick hands-on view of what this code does, see jupyter notebook at https://github.com/kristenhahn/cta_bus_tracker_exploration/blob/main/all_headways_all_stops_single_route.ipynb.
 
-- Calculates active service times for a given bus stop and direction of travel. These are continuous time ranges when ANY buses on any service for this route and direction are scheduled to be running at a given bus stop. Identifying these active service times allows us to skip out-of-service periods in the headway calcs so they don't show up incorrectly as long headways.  Active service times are based on gtfs schedule information, and they are specific to each bus stop and direction of travel.
+- Calculates active service times for a given bus stop and direction of travel. These are continuous time ranges when ANY buses on any service for this route and direction are scheduled to be running at a given bus stop. Identifying these active service times allows us to skip out-of-service periods in the headway calcs so they don't show up incorrectly as long headways.  Active service times are based on gtfs schedule information, and they are specific to each bus stop and direction of travel. 
 
 - Calculates all scheduled headways at a bus stop on a specified date within the active service times.  Scheduled headways are based on gtfs bus schedules scraped using code from the chi-hack-night team.
 
@@ -55,7 +55,9 @@ a given pattern and the distance along the pattern where each stop is located.
 
 4. Calculate the overall in-service times for a given bus stop, route, and direction of travel (continuous timeframes when one or more service(s) is/are active)
 
-5. Calculate headways ONLY for the times service is active on that route/stop/direction of travel. This fixes an earlier issue where out-of-service times looked like long headways.  
+5. A 10 minute buffer is added to the start and end of each scheduled active service time to capture any buses that arrive slightly early or late.
+
+6. Calculate headways ONLY for the times service is active on that route/stop/direction of travel. This fixes an earlier issue where out-of-service times looked like long headways.  
 
 ## Detailed approach:  Scheduled Headways
 
@@ -82,19 +84,17 @@ a given pattern and the distance along the pattern where each stop is located.
 
 6. Calculate actual headways between buses based on stop times.  (Stop time of current bus - stop time of previous bus)
 
-Note: If a bus arrives outside of the active service times expected for a given bus stop, that bus will not be counted in the headway calculations for that stop.  For each active service time range, headways are calculated starting with the second bus arriving in the active service time range (because there has to be a previous bus to set the start of the headway interval).   Headway calculations end with the last bus in the active service time range.
+Note: If a bus arrives outside of the active service times expected for a given bus stop (plus a 10-minute buffer at the beginning and end of the scheduled times), that bus will not be counted in the headway calculations for that stop.  For each active service time range, headways are calculated starting with the second bus arriving in that time range (because there has to be a previous bus to set the start of the headway interval).   Headway calculations end with the last bus in the active service time range.
 
 7. Calculate summary statistics on actual headways for this bus stop and route (total daily buses, mean, 25th Percentile, median, 75th percentile)
 
-Note that the total daily bus number may be off by 1-2 even if all buses are running.  Any bus that arrives slightly outside the expected active service times will not be counted.  See to do list below.
+Note that the total daily bus number may be off slightly even if all buses are running.  Any bus that arrives slightly outside the expected active service times will not be counted.  Scheduled service times are extended by 10 minutes beyond the GTFT scheduled times at the beginning and end, so this will hopefully capture the bulk of the buses.  But any buses more than 10 minutes outside the expected service times based on GTFS data will not be captured.
 
 ## To Do
 
 - Investigate how to address bus stops near the end of a route (see the caution message above)
 
-- Investigate adding 5-10 minutes to the beginning and end of each active service interval, so that slightly early/late buses in the realtime data are accounted for in the actual headway data.
-
-- Investigate why stops are duplicated in the summary data for some routes in the geoDataFrames and geoJSON files.
+- Investigate why stops are duplicated in the summary data for some routes in the geoDataFrames and geoJSON files.  A short term workaround could be deleting duplicate rows, but would be better to figure out why they're duplicated in the first place.
 
 - Investigate EWT calcs Sean found: https://www.trapezegroup.com.au/resources/infographic-how-to-calculate-excess-waiting-time/ 
 

@@ -152,8 +152,10 @@ def get_active_service_times(stop_details:pd.DataFrame, stop_id:str, direction:s
     for service_id in service_ids:
         df_service = single_stop_details.loc[single_stop_details['service_id'] == service_id]
         times = df_service['stop_time'].tolist()
-        start_time = min(times)
-        end_time = max(times)
+        # start and end times adjusted to allow 10 minute buffers for buses arriving
+        # slightly earlier or later than scheduled.
+        start_time = min(times)-pd.Timedelta(minutes=10)
+        end_time = max(times)+pd.Timedelta(minutes=10)
 
         # print(f'service id {service_id}, start {start_time}, end {end_time}')
 
@@ -339,7 +341,8 @@ def get_chn_vehicles(date_string:str) -> pd.DataFrame:
     
     Data is returned in a pandas dataframe. Columns include vehicle id (vid), timestamp (tmstmp), 
     pattern id (pid), and distance along the pattern (pdist) for each vehicle at 5-minute intervals 
-    throughout the requested time range on the requested calendar day.
+    throughout the requested time range on the requested calendar day and the following day.
+    Two days are required becuase bus schedules run past midnight.
     """
 
     day1 = pd.to_datetime(date_string, infer_datetime_format=True)
