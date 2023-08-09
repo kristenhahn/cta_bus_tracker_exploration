@@ -293,7 +293,7 @@ def get_headway_stats(headways:pd.DataFrame, headway_column_name:str, output_col
         # filter to actual values, not null / nat, nan, etc.
         headways_col = headways_col[pd.notnull(headways_col)].copy()
 
-        col_name_total = 'TEST - not ready yet - total buses'
+        col_name_total = 'total buses'
         col_name_mean = 'mean headway (minutes)'
         col_name_25th = '25th percentile headway (minutes)'
         col_name_median = 'median headway (minutes)'
