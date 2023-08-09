@@ -94,6 +94,8 @@ Note that the total daily bus number may be off slightly even if all buses are r
 
 - Investigate how to address bus stops near the end of a route (see the caution message above)
 
+- Investigate whether the end of route issue also applies to the end of each pattern within a route.  If it does, then there may be uncounted buses mid-route too.
+
 - Investigate why stops are duplicated in the summary data for some routes in the geoDataFrames and geoJSON files.  A short term workaround could be deleting duplicate rows, but would be better to figure out why they're duplicated in the first place.
 
 - Investigate EWT calcs Sean found: https://www.trapezegroup.com.au/resources/infographic-how-to-calculate-excess-waiting-time/ 
